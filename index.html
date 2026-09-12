@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Quản Lý Trực Nhật - Minh Thành, Hải Sơn, Gia Huy, Xuân Đức</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        @keyframes pulse-subtle {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        .pulse-active { animation: pulse-subtle 2s infinite ease-in-out; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-indigo-50 to-slate-100 min-h-screen text-slate-800 pb-12">
+
+    <header class="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50 border-b border-slate-200">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-200">
+                    <i class="fa-solid fa-clipboard-check text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-slate-900 leading-tight">Trực Nhật 4 Thành Viên</h1>
+                    <p class="text-xs text-slate-500">Minh Thành • Hải Sơn • Gia Huy • Xuân Đức</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <div id="realtimeStatusBadge" class="bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span>Thời gian thực</span>
+                </div>
+                
+                <!-- Khối hiển thị người dùng đã đăng nhập -->
+                <div id="loggedInUserBadge" class="hidden bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-sm">
+                    <div id="userHeaderAvatar" class="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center">M</div>
+                    <span id="userHeaderName" class="text-xs font-bold text-blue-900">Minh Thành</span>
+                    <button onclick="logout()" class="text-xs text-rose-600 hover:text-rose-700 font-semibold ml-1 pl-2 border-l border-blue-200 flex items-center gap-1" title="Đăng xuất">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span class="hidden sm:inline">Thoát</span>
+                    </button>
+                </div>
+
+                <button onclick="requestNotificationPermission()" id="notifyBtn" class="bg-slate-200 hover:bg-slate-300 text-slate-700 p-2 rounded-lg transition text-xs flex items-center gap-1.5" title="Bật thông báo màn hình">
+                    <i class="fa-solid fa-bell"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <!-- Cột trái & giữa: 2 nhiệm vụ chính (Chiếm 2 cột trên desktop) -->
+        <div class="md:col-span-2 space-y-6">
+            
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-100 gap-3">
+                <div>
+                    <h2 class="font-bold text-slate-800 text-base"><i class="fa-solid fa-calendar-day text-blue-600 mr-2"></i>Trạng thái trực nhật hôm nay</h2>
+                    <p class="text-xs text-slate-500" id="currentDateString">Đang cập nhật thời gian...</p>
+                </div>
+            </div>
+
+            <!-- Widget Biểu quyết Đặt lại Vòng (Cần 4/4 thành viên đồng ý) -->
+            <div class="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold text-xs shadow">
+                            <i class="fa-solid fa-users-check"></i>
+                        </div>
+                        <h3 class="font-bold text-sm text-amber-900">Yêu cầu Đặt lại Vòng Trực Nhật</h3>
+                    </div>
+                    <span id="voteCountBadge" class="bg-amber-200 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-full">
+                        0 / 4 Đồng ý
+                    </span>
+                </div>
+                <p class="text-xs text-amber-700 mb-3">Vòng trực nhật chỉ được khởi tạo lại khi <strong>toàn bộ 4 thành viên</strong> cùng bấm đồng ý.</p>
+                
+                <!-- Tiến độ đồng ý của 4 thành viên -->
+                <div id="voteMemberList" class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                    <!-- Rendered dynamically -->
+                </div>
+
+                <button id="voteResetBtn" onclick="toggleResetVote()" class="w-full bg-amber-500 hover:bg-amber-600 active:scale-98 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2 text-xs">
+                    <i class="fa-solid fa-thumbs-up"></i>
+                    <span id="voteBtnText">Tôi Đồng Ý Đặt Lại Vòng Trực Nhật</span>
+                </button>
+            </div>
+
+            <!-- Grid 2 mục: Dọn nhà vệ sinh & Dọn phòng -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                
+                <!-- Mục 1: Dọn nhà vệ sinh -->
+                <div class="glass-card rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden pulse-active">
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-blue-100 rounded-bl-full -z-10 opacity-50"></div>
+                    <div>
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                                <i class="fa-solid fa-restroom mr-1"></i> Vệ Sinh
+                            </span>
+                            <span id="toiletStatusBadge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
+                                <i class="fa-solid fa-clock mr-1"></i> Chưa xong
+                            </span>
+                        </div>
+                        
+                        <h3 class="text-lg font-bold text-slate-900 mb-1">Dọn nhà vệ sinh</h3>
+                        <p class="text-xs text-slate-500 mb-4">Làm sạch sàn, gương, thiết bị vệ sinh & đổ rác.</p>
+
+                        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 mb-4">
+                            <span class="text-xs text-slate-400 block mb-0.5">ĐẾN LƯỢT NGƯỜI:</span>
+                            <div class="flex items-center justify-between mt-1">
+                                <div class="flex items-center gap-2.5">
+                                    <div id="toiletAvatar" class="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm shadow">M</div>
+                                    <span id="toiletAssignee" class="font-bold text-base text-blue-900">Minh Thành</span>
+                                </div>
+                                <span id="toiletTurnIndicator" class="text-[11px] font-semibold px-2 py-0.5 rounded-md hidden">Đến lượt bạn!</span>
+                            </div>
+                        </div>
+
+                        <div class="text-xs text-slate-500 space-y-1 mb-4">
+                            <div><i class="fa-solid fa-history mr-1 text-slate-400"></i> Lần trước: <span id="toiletLast" class="font-medium text-slate-700">Chưa có</span></div>
+                            <div><i class="fa-solid fa-clock-rotate-left mr-1 text-slate-400"></i> Lúc: <span id="toiletTime" class="font-medium text-slate-700">--:--</span></div>
+                        </div>
+                    </div>
+
+                    <button id="toiletCompleteBtn" onclick="completeTask('toilet')" class="w-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold py-3 px-4 rounded-xl shadow-md shadow-blue-200 transition flex items-center justify-center gap-2 text-sm">
+                        <i class="fa-solid fa-check-circle text-base"></i> Đã hoàn thành nhiệm vụ
+                    </button>
+                    <p id="toiletLockedText" class="text-center text-xs text-rose-500 font-medium mt-2 hidden"><i class="fa-solid fa-lock mr-1"></i>Chỉ tài khoản của người đến lượt mới được xác nhận</p>
+                </div>
+
+                <!-- Mục 2: Dọn phòng -->
+                <div class="glass-card rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-100 rounded-bl-full -z-10 opacity-50"></div>
+                    <div>
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                                <i class="fa-solid fa-house-chimney mr-1"></i> Không Gian
+                            </span>
+                            <span id="roomStatusBadge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
+                                <i class="fa-solid fa-clock mr-1"></i> Chưa xong
+                            </span>
+                        </div>
+                        
+                        <h3 class="text-lg font-bold text-slate-900 mb-1">Dọn phòng chung</h3>
+                        <p class="text-xs text-slate-500 mb-4">Quét nhà, lau nền, sắp xếp bàn ghế & đổ rác phòng.</p>
+
+                        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 mb-4">
+                            <span class="text-xs text-slate-400 block mb-0.5">ĐẾN LƯỢT NGƯỜI:</span>
+                            <div class="flex items-center justify-between mt-1">
+                                <div class="flex items-center gap-2.5">
+                                    <div id="roomAvatar" class="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-sm shadow">H</div>
+                                    <span id="roomAssignee" class="font-bold text-base text-emerald-900">Hải Sơn</span>
+                                </div>
+                                <span id="roomTurnIndicator" class="text-[11px] font-semibold px-2 py-0.5 rounded-md hidden">Đến lượt bạn!</span>
+                            </div>
+                        </div>
+
+                        <div class="text-xs text-slate-500 space-y-1 mb-4">
+                            <div><i class="fa-solid fa-history mr-1 text-slate-400"></i> Lần trước: <span id="roomLast" class="font-medium text-slate-700">Chưa có</span></div>
+                            <div><i class="fa-solid fa-clock-rotate-left mr-1 text-slate-400"></i> Lúc: <span id="roomTime" class="font-medium text-slate-700">--:--</span></div>
+                        </div>
+                    </div>
+
+                    <button id="roomCompleteBtn" onclick="completeTask('room')" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold py-3 px-4 rounded-xl shadow-md shadow-emerald-200 transition flex items-center justify-center gap-2 text-sm">
+                        <i class="fa-solid fa-check-circle text-base"></i> Đã hoàn thành nhiệm vụ
+                    </button>
+                    <p id="roomLockedText" class="text-center text-xs text-rose-500 font-medium mt-2 hidden"><i class="fa-solid fa-lock mr-1"></i>Chỉ tài khoản của người đến lượt mới được xác nhận</p>
+                </div>
+
+            </div>
+            <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button onclick="manualSyncRefresh()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-lg transition text-xs flex items-center gap-1.5 font-semibold" title="Làm mới dữ liệu">
+                    <i id="syncRefreshIcon" class="fa-solid fa-rotate"></i>
+                    <span class="hidden sm:inline">Làm mới</span>
+                </button>
+                <div id="realtimeStatusBadge" class="bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span>Thời gian thực</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Cột phải: Lịch sử hoạt động & Nhật ký thông báo -->
+        <div class="space-y-6">
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col h-[520px]">
+                <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
+                    <h3 class="font-bold text-sm text-slate-800"><i class="fa-solid fa-clock-rotate-left text-blue-600 mr-2"></i>Lịch sử hoạt động</h3>
+                    <button onclick="clearHistory()" class="text-xs text-slate-400 hover:text-slate-600">Xóa</button>
+                </div>
+                
+                <div id="historyContainer" class="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
+                    <p class="text-slate-400 text-center py-10 italic">Chưa có lịch sử trực nhật nào gần đây.</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal Đăng Nhập Bảo Mật -->
+    <div id="loginModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full p-6 sm:p-8 relative">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-blue-200">
+                    <i class="fa-solid fa-shield-halved text-2xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900">Đăng Nhập Trực Nhật</h2>
+                <p class="text-xs text-slate-500 mt-1">Vui lòng chọn tài khoản cá nhân để tiếp tục</p>
+            </div>
+
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Thành viên</label>
+                    <select id="loginUserSelect" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="Minh Thành">Minh Thành</option>
+                        <option value="Hải Sơn">Hải Sơn</option>
+                        <option value="Gia Huy">Gia Huy</option>
+                        <option value="Xuân Đức">Xuân Đức</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Mật khẩu bảo mật</label>
+                    <div class="relative">
+                        <input type="password" id="loginPassword" required placeholder="Nhập mật khẩu..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none pr-10">
+                        <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm p-1">
+                            <i id="eyeIcon" class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Thêm Tùy Chọn Ghi Nhớ Đăng Nhập -->
+                <div class="flex items-center justify-between text-xs px-1">
+                    <label class="flex items-center gap-2 cursor-pointer text-slate-600 font-medium">
+                        <input type="checkbox" id="rememberMeCheckbox" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500" checked>
+                        <span>Ghi nhớ mật khẩu & đăng nhập</span>
+                    </label>
+                </div>
+
+                <p id="loginError" class="text-xs text-rose-600 font-semibold hidden text-center bg-rose-50 p-2.5 rounded-xl border border-rose-200"></p>
+
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 transition flex items-center justify-center gap-2 text-sm">
+                    <i class="fa-solid fa-right-to-bracket"></i> Đăng Nhập Hệ Thống
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full px-4 sm:px-0 pointer-events-none"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const members = ['Minh Thành', 'Hải Sơn', 'Gia Huy', 'Xuân Đức'];
+        
+        const USER_CREDENTIALS = {
+            'Minh Thành': 'Xy7#kL9p',
+            'Hải Sơn': 'mQ2$vN8r',
+            'Gia Huy': 'Bt5@wX3z',
+            'Xuân Đức': 'Jp9&hF4k'
+        };
+
+        const getStoredUser = () => localStorage.getItem('duty_logged_user') || sessionStorage.getItem('duty_logged_user');
+        
+        let appState = {
+            currentUser: getStoredUser() || null,
+            toilet: {
+                currentIndex: 0,
+                status: 'pending',
+                lastCompletedBy: 'Chưa có',
+                timestamp: '--:--'
+            },
+            room: {
+                currentIndex: 1,
+                status: 'pending',
+                lastCompletedBy: 'Chưa có',
+                timestamp: '--:--'
+            },
+            resetVotes: [],
+            history: []
+        };
+
+        window.handleLogin = function(e) {
+            e.preventDefault();
+            const selectedUser = document.getElementById('loginUserSelect').value;
+            const passInput = document.getElementById('loginPassword').value;
+            const errorEl = document.getElementById('loginError');
+            const rememberMe = document.getElementById('rememberMeCheckbox').checked;
+
+            if (USER_CREDENTIALS[selectedUser] === passInput) {
+                appState.currentUser = selectedUser;
+                
+                if (rememberMe) {
+                    localStorage.setItem('duty_logged_user', selectedUser);
+                } else {
+                    sessionStorage.setItem('duty_logged_user', selectedUser);
+                    localStorage.removeItem('duty_logged_user');
+                }
+
+                document.getElementById('loginModal').classList.add('hidden');
+                document.getElementById('loginPassword').value = '';
+                errorEl.classList.add('hidden');
+                updateUI();
+                showToast(`Chào mừng ${selectedUser} đã đăng nhập thành công!`);
+            } else {
+                errorEl.innerText = "Mật khẩu không chính xác! Vui lòng thử lại.";
+                errorEl.classList.remove('hidden');
+            }
+        };
+
+        window.logout = function() {
+            localStorage.removeItem('duty_logged_user');
+            sessionStorage.removeItem('duty_logged_user');
+            appState.currentUser = null;
+            document.getElementById('loginModal').classList.remove('hidden');
+            updateUI();
+            showToast("Đã đăng xuất tài khoản.");
+        };
+
+        window.togglePasswordVisibility = function() {
+            const passInput = document.getElementById('loginPassword');
+            const eyeIcon = document.getElementById('eyeIcon');
+            if (passInput.type === 'password') {
+                passInput.type = 'text';
+                eyeIcon.className = 'fa-solid fa-eye-slash';
+            } else {
+                passInput.type = 'password';
+                eyeIcon.className = 'fa-solid fa-eye';
+            }
+        };
+
+        let db = null;
+        let auth = null;
+        let currentUserAuth = null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'duty-app-default';
+        const docRefPath = ['artifacts', appId, 'public', 'data', 'duty_schedule', 'current_state'];
+
+        async function initCloudSync() {
+            try {
+                if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                    const config = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+                    const app = initializeApp(config);
+                    db = getFirestore(app);
+                    auth = getAuth(app);
+
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        const credential = await signInWithCustomToken(auth, __initial_auth_token);
+                        currentUserAuth = credential.user;
+                    } else {
+                        const credential = await signInAnonymously(auth);
+                        currentUserAuth = credential.user;
+                    }
+
+                    if (currentUserAuth && db) {
+                        const stateDocRef = doc(db, ...docRefPath);
+                        onSnapshot(stateDocRef, (snapshot) => {
+                            if (snapshot.exists()) {
+                                const data = snapshot.data();
+                                const activeUser = getStoredUser() || appState.currentUser;
+                                appState = { ...data, currentUser: activeUser };
+                                if (!appState.resetVotes) appState.resetVotes = [];
+                                updateUI();
+                                setRealtimeBadge(true);
+                            } else {
+                                saveDataToCloud();
+                            }
+                        }, (err) => {
+                            console.error("Snapshot error:", err);
+                            setRealtimeBadge(false);
+                        });
+                    }
+                } else {
+                    loadLocalData();
+                    updateUI();
+                    setRealtimeBadge(false);
+                }
+            } catch (e) {
+                console.error("Firebase init failed, using local storage", e);
+                loadLocalData();
+                updateUI();
+                setRealtimeBadge(false);
+            }
+        }
+
+        window.manualSyncRefresh = async function() {
+            const icon = document.getElementById('syncRefreshIcon');
+            icon.classList.add('fa-spin');
+            
+            if (db && currentUserAuth) {
+                try {
+                    const stateDocRef = doc(db, ...docRefPath);
+                    const snapshot = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js").then(m => m.getDoc(stateDocRef));
+                    if (snapshot.exists()) {
+                        const data = snapshot.data();
+                        const activeUser = getStoredUser() || appState.currentUser;
+                        appState = { ...data, currentUser: activeUser };
+                        if (!appState.resetVotes) appState.resetVotes = [];
+                        updateUI();
+                        showToast("Đã đồng bộ dữ liệu mới nhất thành công!");
+                    }
+                } catch (e) {
+                    console.error("Manual sync error:", e);
+                    showToast("Lỗi khi đồng bộ dữ liệu.");
+                }
+            } else {
+                loadLocalData();
+                updateUI();
+                showToast("Đã làm mới dữ liệu cục bộ.");
+            }
+
+            setTimeout(() => {
+                icon.classList.remove('fa-spin');
+            }, 600);
+        };
+
+        function setRealtimeBadge(isOnline) {
+            const badge = document.getElementById('realtimeStatusBadge');
+            if (badge) {
+                if (isOnline) {
+                    badge.className = 'bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5 text-xs font-semibold text-emerald-700';
+                    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span><span>Thời gian thực</span>`;
+                } else {
+                    badge.className = 'bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5 text-xs font-semibold text-slate-600';
+                    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-400"></span><span>Nội bộ (Local)</span>`;
+                }
+            }
+        }
+
+        function loadLocalData() {
+            const saved = localStorage.getItem('duty_schedule_app_v1');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    appState = { ...parsed, currentUser: getStoredUser() };
+                    if (!appState.resetVotes) appState.resetVotes = [];
+                } catch (e) { console.error(e); }
+            }
+        }
+
+        async function saveDataToCloud() {
+            localStorage.setItem('duty_schedule_app_v1', JSON.stringify(appState));
+            if (db && currentUserAuth) {
+                try {
+                    const stateDocRef = doc(db, ...docRefPath);
+                    await setDoc(stateDocRef, {
+                        toilet: appState.toilet,
+                        room: appState.room,
+                        resetVotes: appState.resetVotes || [],
+                        history: appState.history || [],
+                        updatedAt: new Date().toISOString()
+                    }, { merge: true });
+                } catch (err) {
+                    console.error("Cloud save failed:", err);
+                }
+            }
+        }
+
+        const currentDateString = document.getElementById('currentDateString');
+        
+        const toiletAssignee = document.getElementById('toiletAssignee');
+        const toiletAvatar = document.getElementById('toiletAvatar');
+        const toiletStatusBadge = document.getElementById('toiletStatusBadge');
+        const toiletLast = document.getElementById('toiletLast');
+        const toiletTime = document.getElementById('toiletTime');
+
+        const roomAssignee = document.getElementById('roomAssignee');
+        const roomAvatar = document.getElementById('roomAvatar');
+        const roomStatusBadge = document.getElementById('roomStatusBadge');
+        const roomLast = document.getElementById('roomLast');
+        const roomTime = document.getElementById('roomTime');
+
+        const historyContainer = document.getElementById('historyContainer');
+        const memberQueueList = document.getElementById('memberQueueList');
+        const voteMemberList = document.getElementById('voteMemberList');
+        const voteCountBadge = document.getElementById('voteCountBadge');
+        const voteBtnText = document.getElementById('voteBtnText');
+        const voteResetBtn = document.getElementById('voteResetBtn');
+
+        function updateUI() {
+            const loggedUser = getStoredUser();
+            const loginModal = document.getElementById('loginModal');
+            const loggedInBadge = document.getElementById('loggedInUserBadge');
+
+            if (loggedUser) {
+                appState.currentUser = loggedUser;
+                if (loginModal) loginModal.classList.add('hidden');
+                if (loggedInBadge) {
+                    loggedInBadge.classList.remove('hidden');
+                    document.getElementById('userHeaderName').innerText = loggedUser;
+                    document.getElementById('userHeaderAvatar').innerText = loggedUser.charAt(0);
+                }
+            } else {
+                if (loginModal) loginModal.classList.remove('hidden');
+                if (loggedInBadge) loggedInBadge.classList.add('hidden');
+            }
+
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            currentDateString.innerText = now.toLocaleDateString('vi-VN', options);
+
+            const currentToiletMember = members[appState.toilet.currentIndex];
+        toiletAssignee.innerText = currentToiletMember;
+        toiletAvatar.innerText = currentToiletMember.charAt(0);
+        toiletLast.innerText = appState.toilet.lastCompletedBy;
+        toiletTime.innerText = appState.toilet.timestamp;
+
+        const isToiletUserTurn = appState.currentUser === currentToiletMember;
+        const toiletBtn = document.getElementById('toiletCompleteBtn');
+        const toiletLocked = document.getElementById('toiletLockedText');
+        const toiletTurnIndicator = document.getElementById('toiletTurnIndicator');
+
+        if (isToiletUserTurn) {
+            toiletBtn.disabled = false;
+            toiletBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            toiletLocked.classList.add('hidden');
+            toiletTurnIndicator.className = 'text-[11px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700';
+            toiletTurnIndicator.innerText = 'Đến lượt bạn!';
+            toiletTurnIndicator.classList.remove('hidden');
+        } else {
+            toiletBtn.disabled = true;
+            toiletBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            toiletLocked.classList.remove('hidden');
+            toiletTurnIndicator.className = 'text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500';
+            toiletTurnIndicator.innerText = `Lượt của ${currentToiletMember}`;
+            toiletTurnIndicator.classList.remove('hidden');
+        }
+
+        if (appState.toilet.status === 'completed') {
+            toiletStatusBadge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 animate-pulse';
+            toiletStatusBadge.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Đã hoàn thành';
+        } else {
+            toiletStatusBadge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700';
+            toiletStatusBadge.innerHTML = '<i class="fa-solid fa-clock mr-1"></i> Đang chờ';
+        }
+
+        const currentRoomMember = members[appState.room.currentIndex];
+        roomAssignee.innerText = currentRoomMember;
+        roomAvatar.innerText = currentRoomMember.charAt(0);
+        roomLast.innerText = appState.room.lastCompletedBy;
+        roomTime.innerText = appState.room.timestamp;
+
+        const isRoomUserTurn = appState.currentUser === currentRoomMember;
+        const roomBtn = document.getElementById('roomCompleteBtn');
+        const roomLocked = document.getElementById('roomLockedText');
+        const roomTurnIndicator = document.getElementById('roomTurnIndicator');
+
+        if (isRoomUserTurn) {
+            roomBtn.disabled = false;
+            roomBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            roomLocked.classList.add('hidden');
+            roomTurnIndicator.className = 'text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700';
+            roomTurnIndicator.innerText = 'Đến lượt bạn!';
+            roomTurnIndicator.classList.remove('hidden');
+        } else {
+            roomBtn.disabled = true;
+            roomBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            roomLocked.classList.remove('hidden');
+            roomTurnIndicator.className = 'text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500';
+            roomTurnIndicator.innerText = `Lượt của ${currentRoomMember}`;
+            roomTurnIndicator.classList.remove('hidden');
+        }
+
+        if (appState.room.status === 'completed') {
+            roomStatusBadge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 animate-pulse';
+            roomStatusBadge.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Đã hoàn thành';
+        } else {
+            roomStatusBadge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700';
+            roomStatusBadge.innerHTML = '<i class="fa-solid fa-clock mr-1"></i> Đang chờ';
+        }
+
+        renderVoteStatus();
+        renderQueue();
+        renderHistory();
+    }
+
+    function renderVoteStatus() {
+            const votes = appState.resetVotes || [];
+            voteCountBadge.innerText = `${votes.length} / 4 Đồng ý`;
+
+            let html = '';
+            members.forEach(m => {
+                const hasVoted = votes.includes(m);
+                if (hasVoted) {
+                    html += `
+                        <div class="bg-emerald-100 border border-emerald-300 text-emerald-800 p-2 rounded-xl flex items-center justify-between text-xs font-medium">
+                            <span class="truncate">${m}</span>
+                            <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="bg-white/80 border border-amber-200 text-slate-500 p-2 rounded-xl flex items-center justify-between text-xs">
+                            <span class="truncate">${m}</span>
+                            <i class="fa-solid fa-clock text-amber-400"></i>
+                        </div>
+                    `;
+                }
+            });
+            voteMemberList.innerHTML = html;
+
+            const isUserVoted = votes.includes(appState.currentUser);
+            if (isUserVoted) {
+                voteBtnText.innerText = `Rút lại ý kiến đồng ý (${appState.currentUser || ''})`;
+                voteResetBtn.className = "w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2.5 px-4 rounded-xl transition flex items-center justify-center gap-2 text-xs";
+            } else {
+                voteBtnText.innerText = `Tôi Đồng Ý Đặt Lại Vòng (${appState.currentUser || ''})`;
+                voteResetBtn.className = "w-full bg-amber-500 hover:bg-amber-600 active:scale-98 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2 text-xs";
+            }
+        }
+
+        window.toggleResetVote = async function() {
+            if (!appState.currentUser) {
+                document.getElementById('loginModal').classList.remove('hidden');
+                return;
+            }
+
+            const user = appState.currentUser;
+            if (!appState.resetVotes) appState.resetVotes = [];
+
+            const index = appState.resetVotes.indexOf(user);
+            if (index > -1) {
+                appState.resetVotes.splice(index, 1);
+                showToast(`Bạn (${user}) đã rút lại ý kiến biểu quyết.`);
+            } else {
+                appState.resetVotes.push(user);
+                showToast(`Thành công! Bạn (${user}) đã bấm ĐỒNG Ý đặt lại vòng.`);
+            }
+
+            if (members.every(m => appState.resetVotes.includes(m))) {
+                appState.toilet.currentIndex = 0;
+                appState.room.currentIndex = 1;
+                appState.toilet.status = 'pending';
+                appState.room.status = 'pending';
+                appState.resetVotes = [];
+
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                appState.history.unshift({
+                    text: `🎉 Tất cả 4/4 thành viên (Minh Thành, Hải Sơn, Gia Huy, Xuân Đức) đã ĐỒNG Ý! Vòng trực nhật đã được đặt lại ban đầu.`,
+                    time: timeString,
+                    date: now.toLocaleDateString('vi-VN')
+                });
+
+                showToast(`🎉 Đã nhận đủ 4/4 đồng ý! Vòng trực nhật đã chính thức được đặt lại!`);
+                sendPushNotification(`Đặt Lại Vòng Trực Nhật`, `Tất cả 4 thành viên đã đồng ý! Vòng trực nhật đã được làm mới lại từ đầu.`);
+            }
+
+            await saveDataToCloud();
+            updateUI();
+        };
+
+        function renderQueue() {
+            let html = '';
+            members.forEach((m, idx) => {
+                let roles = [];
+                if (members[appState.toilet.currentIndex] === m) roles.push('Vệ Sinh');
+                if (members[appState.room.currentIndex] === m) roles.push('Phòng');
+
+                let badgeHtml = roles.length > 0 
+                    ? `<div class="mt-1 flex flex-wrap justify-center gap-1"><span class="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded font-bold">${roles.join(' & ')}</span></div>` 
+                    : '';
+
+                html += `
+                    <div class="p-2.5 rounded-xl border border-slate-100 bg-slate-50 flex flex-col items-center justify-center">
+                        <div class="w-7 h-7 rounded-full bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center mb-1">${m.charAt(0)}</div>
+                        <span class="font-semibold text-slate-800 text-xs truncate w-full text-center">${m}</span>
+                        ${badgeHtml}
+                    </div>
+                `;
+            });
+            memberQueueList.innerHTML = html;
+        }
+
+        window.completeTask = async function(taskType) {
+            if (!appState.currentUser) {
+                document.getElementById('loginModal').classList.remove('hidden');
+                return;
+            }
+
+            const assignee = taskType === 'toilet' ? members[appState.toilet.currentIndex] : members[appState.room.currentIndex];
+            if (appState.currentUser !== assignee) {
+                showToast("Chỉ tài khoản của người đến lượt mới được bấm xác nhận!");
+                return;
+            }
+
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            let taskName = taskType === 'toilet' ? 'Dọn nhà vệ sinh' : 'Dọn phòng chung';
+
+            if (taskType === 'toilet') {
+                appState.toilet.lastCompletedBy = assignee;
+                appState.toilet.timestamp = timeString;
+                appState.toilet.status = 'completed';
+                appState.toilet.currentIndex = (appState.toilet.currentIndex + 1) % members.length;
+            } else {
+                appState.room.lastCompletedBy = assignee;
+                appState.room.timestamp = timeString;
+                appState.room.status = 'completed';
+                appState.room.currentIndex = (appState.room.currentIndex + 1) % members.length;
+            }
+
+            const logItem = {
+                text: `${assignee} vừa hoàn thành xong [${taskName}] lúc ${timeString}!`,
+                time: timeString,
+                date: now.toLocaleDateString('vi-VN')
+            };
+            appState.history.unshift(logItem);
+            if (appState.history.length > 25) appState.history.pop();
+
+            await saveDataToCloud();
+            updateUI();
+
+            showToast(`Tuyệt vời! ${assignee} đã hoàn thành ${taskName}. Lượt tiếp theo đã được cập nhật.`);
+            sendPushNotification(`Thông báo Trực nhật`, `${assignee} vừa hoàn thành xong mục ${taskName}! Đã chuyển lượt tiếp theo.`);
+
+            setTimeout(async () => {
+                if (taskType === 'toilet') {
+                    appState.toilet.status = 'pending';
+                } else {
+                    appState.room.status = 'pending';
+                }
+                await saveDataToCloud();
+                updateUI();
+            }, 2000);
+        };
+
+        window.clearHistory = async function() {
+            appState.history = [];
+            await saveDataToCloud();
+            updateUI();
+        };
+
+        function renderHistory() {
+            if (!appState.history || appState.history.length === 0) {
+                historyContainer.innerHTML = `<p class="text-slate-400 text-center py-10 italic">Chưa có lịch sử trực nhật nào gần đây.</p>`;
+                return;
+            }
+
+            let html = '';
+            appState.history.forEach(item => {
+                html += `
+                    <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-start gap-2.5">
+                        <div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                            <i class="fa-solid fa-bell text-[10px]"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-slate-700 font-medium leading-relaxed">${item.text}</p>
+                            <span class="text-[10px] text-slate-400 mt-0.5 block">${item.time} - ${item.date}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            historyContainer.innerHTML = html;
+        }
+
+        function showToast(message) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'pointer-events-auto bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 transform translate-y-2 opacity-0 transition-all duration-300 text-xs font-medium';
+            toast.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 text-base"></i><span>${message}</span>`;
+            
+            container.appendChild(toast);
+            setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 10);
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        window.requestNotificationPermission = function() {
+            if (!("Notification" in window)) {
+                showToast("Trình duyệt này không hỗ trợ thông báo đẩy.");
+                return;
+            }
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    showToast("Đã bật thông báo màn hình thành công!");
+                } else {
+                    showToast("Bạn đã từ chối quyền nhận thông báo.");
+                }
+            });
+        };
+
+        function sendPushNotification(title, body) {
+            if (window.Notification && Notification.permission === "granted") {
+                try {
+                    new Notification(title, {
+                        body: body,
+                        icon: 'https://placehold.co/128x128/2563eb/ffffff?text=TN'
+                    });
+                } catch (e) {
+                    console.log("Notification error", e);
+                }
+            }
+        }
+
+        window.onload = function() {
+            initCloudSync();
+        };
+    </script>
+</body>
+</html>
